@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mattel WSR Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+
+*{
+    box-sizing:border-box;
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+}
+
+body{
+    margin:0;
+    min-height:100vh;
+    background:#ffffff;
+    display:flex;
+    flex-direction:column;
+    color:#111827;
+}
+
+.page-container{
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:40px 16px;
+}
+
+.card{
+    width:800px;
+    max-width:95%;
+    padding:40px;
+    border-radius:16px;
+    background:#ffffff;
+    border:1px solid #e5e7eb;
+    box-shadow:0 10px 30px rgba(0,0,0,.08);
+}
+
+.header{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:12px;
+}
+
+.logo{
+    width:50px;
+    height:50px;
+}
+
+h1{
+    margin:0;
+    font-size:28px;
+}
+
+.header-divider{
+    margin:25px 0;
+    border-top:1px solid #e5e7eb;
+}
+
+.form-row{
+    display:grid;
+    grid-template-columns:180px 1fr;
+    align-items:center;
+    gap:16px;
+    margin-bottom:16px;
+}
+
+label{
+    text-align:right;
+    font-weight:600;
+}
+
+select{
+    width:100%;
+    padding:12px;
+    border-radius:10px;
+    border:1px solid #d1d5db;
+}
+
+.btn{
+    width:100%;
+    padding:14px;
+    margin-top:15px;
+    border:none;
+    border-radius:12px;
+    background:linear-gradient(90deg,#ef4444,#dc2626);
+    color:white;
+    cursor:pointer;
+    font-size:16px;
+    font-weight:600;
+}
+
+.result{
+    margin-top:35px;
+}
+
+.summary-card{
+    background:#fef2f2;
+    border:1px solid #fecaca;
+    border-radius:12px;
+    padding:16px;
+    text-align:center;
+    margin-bottom:20px;
+}
+
+.summary-card h2{
+    margin:0;
+    color:#b91c1c;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:20px;
+    border:2px solid #ef4444;
+    border-radius:12px;
+    overflow:hidden;
+}
+
+th{
+    background:#fef2f2;
+    color:#b91c1c;
+    padding:12px;
+}
+
+td{
+    padding:12px;
+    text-align:center;
+    border-bottom:1px solid #f1f5f9;
+}
+
+.error{
+    color:#dc2626;
+    text-align:center;
+    font-weight:600;
+    margin-top:20px;
+}
+
+.footer{
+    margin-top:30px;
+    padding-top:16px;
+    border-top:1px solid #e5e7eb;
+    text-align:center;
+    font-size:13px;
+}
+
+.footer-link{
+    color:#dc2626;
+    text-decoration:none;
+    font-weight:600;
+}
+
+.bottom-footer{
+    background:#ffffff;
+    padding:10px 20px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    font-size:13px;
+    font-weight:600;
+    border-top:2px solid #3d6be0;
+}
+
+.bottom-footer img{
+    height:24px;
+}
+
+</style>
+</head>
+<body>
+
+<div class="page-container">
+<div class="card">
+
+<div class="header">
+    <img src="/static/mattel.png" class="logo">
+    <h1>Mattel WSR Dashboard</h1>
+</div>
+
+<div class="header-divider"></div>
+
+<form method="post" action="/fetch-report">
+
+    <div class="form-row">
+        <label>Store</label>
+
+        <select name="store" required>
+            <option value="">Select Store</option>
+
+            {% for store_name in stores %}
+            <option value="{{ store_name }}"
+                {% if store == store_name %}selected{% endif %}>
+                {{ store_name }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <button class="btn" type="submit">
+        Fetch WSR Report
+    </button>
+
+</form>
+
+{% if error %}
+<div class="error">
+    {{ error }}
+</div>
+{% endif %}
+
+{% if report %}
+
+<div class="result">
+
+    <div class="summary-card">
+        <h2>Total WSRs: {{ "{:,}".format(total_count) }}</h2>
+    </div>
+
+    <table>
+
+        <tr>
+            <th>Month</th>
+            <th>WSR Count</th>
+        </tr>
+
+        {% for row in report %}
+        <tr>
+            <td>{{ row.month }}</td>
+            <td>{{ "{:,}".format(row.count) }}</td>
+        </tr>
+        {% endfor %}
+
+    </table>
+
+</div>
+
+{% endif %}
+
+<div class="footer">
+    For further assistance,
+    <a href="#" class="footer-link">
+        raise a GTO ticket
+    </a>
+    and assign it to the
+    <b>ms_marketingintegration</b> group.
+</div>
+
+</div>
+</div>
+
+<div class="bottom-footer">
+    <img src="/static/HCLTech.png">
+    <span>© 2026 Made with ❤️ by HCLTech</span>
+</div>
+
+</body>
+</html>

@@ -1,29 +1,31 @@
 from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
-import os
+import json
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request, Form
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
 
-KLAVIYO_URL = "https://a.klaviyo.com/api/metric-aggregates"
-KLAVIYO_REVISION = "2026-04-15"
+templates = Jinja2Templates(directory="templates")
+
+# Load store -> API key mapping
+with open("stores.json") as f:
+    STORE_KEYS = json.load(f)
+
+# Static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-@app.get("/metric-months")
-async def get_metric_months():
-    api_key = os.getenv("KLAVIYO_API_KEY")
-
-    if not api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="KLAVIYO_API_KEY is not set"
-        )
+async def get_wsr_report(store_api_key: str):
+    """
+    Fetch WSR counts for current month + previous 5 months.
+    """
 
     now = datetime.now(timezone.utc)
 
-    # Current month start (UTC)
     current_month_start = now.replace(
         day=1,
         hour=0,
@@ -32,11 +34,7 @@ async def get_metric_months():
         microsecond=0,
     )
 
-    # Include current month + previous 5 months
     start_month = current_month_start - relativedelta(months=5)
-
-    start_filter = start_month.strftime("%Y-%m-%dT%H:%M:%S")
-    end_filter = now.strftime("%Y-%m-%dT%H:%M:%S")
 
     payload = {
         "data": {
@@ -47,37 +45,33 @@ async def get_metric_months():
                 "interval": "month",
                 "timezone": "UTC",
                 "filter": [
-                    f"greater-or-equal(datetime,{start_filter})",
-                    f"less-than(datetime,{end_filter})",
+                    f"greater-or-equal(datetime,{start_month.strftime('%Y-%m-%dT%H:%M:%S')})",
+                    f"less-than(datetime,{now.strftime('%Y-%m-%dT%H:%M:%S')})",
                 ],
             },
         }
     }
 
     headers = {
-        "Authorization": f"Klaviyo-API-Key {api_key}",
+        "Authorization": f"Klaviyo-API-Key {store_api_key}",
         "accept": "application/vnd.api+json",
         "content-type": "application/vnd.api+json",
-        "revision": KLAVIYO_REVISION,
+        "revision": "2026-04-15",
     }
 
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.post(
-            KLAVIYO_URL,
+            "https://a.klaviyo.com/api/metric-aggregates",
             headers=headers,
             json=payload,
         )
 
-    if response.is_error:
-        raise HTTPException(
-            status_code=response.status_code,
-            detail=response.text,
-        )
+    response.raise_for_status()
 
     response_data = response.json()
-    print(response_data)
-    
+
     attributes = response_data.get("data", {}).get("attributes", {})
+
     dates = attributes.get("dates", [])
 
     count_values = (
@@ -86,12 +80,69 @@ async def get_metric_months():
         .get("count", [])
     )
 
-    return [
-        {
-            "month": date[:7],  # YYYY-MM
-            "count": int(count) if count is not None else 0,
-        }
-        for date, count in zip(dates, count_values)
-    ]
+    report = []
 
-{'data': {'type': 'metric-aggregate', 'id': '8679205039878477414', 'attributes': {'dates': ['2026-01-01T00:00:00+00:00', '2026-02-01T00:00:00+00:00', '2026-03-01T00:00:00+00:00', '2026-04-01T00:00:00+00:00', '2026-05-01T00:00:00+00:00', '2026-06-01T00:00:00+00:00'], 'data': [{'dimensions': [], 'measurements': {'count': [41637.0, 3237.0, 1749.0, 1525.0, 910.0, 431.0]}}]}, 'links': {'self': 'https://a.klaviyo.com/api/metric-aggregates/'}}, 'links': {'self': 'https://a.klaviyo.com/api/metric-aggregates', 'next': None, 'prev': None}}
+    for date, count in zip(dates, count_values):
+        report.append(
+            {
+                "month": date[:7],
+                "count": int(count) if count is not None else 0,
+            }
+        )
+
+    return report
+
+
+@app.get("/")
+async def dashboard(request: Request):
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "stores": list(STORE_KEYS.keys()),
+        },
+    )
+
+
+@app.post("/fetch-report")
+async def fetch_report(
+    request: Request,
+    store: str = Form(...)
+):
+    api_key = STORE_KEYS.get(store)
+
+    if not api_key:
+        return templates.TemplateResponse(
+            "index.html",
+            {
+                "request": request,
+                "stores": list(STORE_KEYS.keys()),
+                "error": "Invalid store selected.",
+            },
+        )
+
+    try:
+        report = await get_wsr_report(api_key)
+
+        total_count = sum(item["count"] for item in report)
+
+        return templates.TemplateResponse(
+            "index.html",
+            {
+                "request": request,
+                "stores": list(STORE_KEYS.keys()),
+                "store": store,
+                "report": report,
+                "total_count": total_count,
+            },
+        )
+
+    except Exception as e:
+        return templates.TemplateResponse(
+            "index.html",
+            {
+                "request": request,
+                "stores": list(STORE_KEYS.keys()),
+                "error": str(e),
+            },
+        )
