@@ -75,7 +75,8 @@ async def get_metric_months():
         )
 
     response_data = response.json()
-
+    print(response_data)
+    
     attributes = response_data.get("data", {}).get("attributes", {})
     dates = attributes.get("dates", [])
 
@@ -92,3 +93,5 @@ async def get_metric_months():
         }
         for date, count in zip(dates, count_values)
     ]
+
+{'data': {'type': 'metric-aggregate', 'id': '8679205039878477414', 'attributes': {'dates': ['2026-01-01T00:00:00+00:00', '2026-02-01T00:00:00+00:00', '2026-03-01T00:00:00+00:00', '2026-04-01T00:00:00+00:00', '2026-05-01T00:00:00+00:00', '2026-06-01T00:00:00+00:00'], 'data': [{'dimensions': [], 'measurements': {'count': [41637.0, 3237.0, 1749.0, 1525.0, 910.0, 431.0]}}]}, 'links': {'self': 'https://a.klaviyo.com/api/metric-aggregates/'}}, 'links': {'self': 'https://a.klaviyo.com/api/metric-aggregates', 'next': None, 'prev': None}}
